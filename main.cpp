@@ -8,100 +8,23 @@
 #include <netinet/in.h> // contains definitions for internet operations, including data structures used in network programming.
 #include <unistd.h>
 #include <netdb.h>
+#include <iostream>
+#include <vector>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netdb.h>
+
 #include "resolver.h"
+#include "scanner.h"
 
-void scan(const std::string& target_ip, const int& start_port, const int& end_port)
-{
-    std::cout << "\nOpening Ports\n";
-    for (int port_number = start_port; port_number < end_port; port_number++)
-    {
-        int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); 
-        if (sock == -1)
-        {
-            std::cerr << "Socket could be created: ";
-            continue;
-        }
-
-        sockaddr_in server_address;
-        server_address.sin_family = AF_INET;
-        server_address.sin_port   = htons(port_number); 
-
-        if (inet_pton(AF_INET, target_ip.c_str(), &server_address.sin_addr) <= 0)
-        {
-            std::cerr << "Invalid IP address !!!\n";
-            close(sock);
-            return;
-        }
-        if (connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) == 0) 
-        {
-            struct servent* service = getservbyport(server_address.sin_port, NULL);
-            std::cout << "Port " << port_number << " ( " << service->s_name << " )\n";
-        }
-
-        close(sock);
-    }
-}
-
-void resolve_ip(const std::string& ip)
-{
-    if (is_valid_ip(ip))
-    {
-        std::cout << ip << " formatı geçerli!" << std::endl;
-    }
-    
-    else if (is_valid_wildcard_format(ip))
-    {
-        std::cout << ip << " formatı geçerli!" << std::endl;
-        std::vector<std::string> expanded_ip_list = expand_wildcard_ip(ip);
-
-        for (const auto& ip : expanded_ip_list)
-        {
-            std::cout << ip << std::endl;
-        }
-    }
-
-    else if (is_valid_range_format(ip)) 
-    {
-        std::vector<std::string> ips = get_ips_from_range(ip);
-        
-        std::cout << "Geçerli IP'ler:" << std::endl;
-        for (const auto& ip : ips) 
-        {
-            std::cout << ip << std::endl;
-        }
-    } 
-    
-    else
-    {
-        std::vector<std::string> ips = get_two_ips(ip);
-
-        if (!ips.empty()) 
-        {
-            std::cout << "Girilen 2 IP:" << std::endl;
-            for (const auto& ip : ips) 
-            {
-                std::cout << ip << std::endl;
-            }
-        } 
-        else 
-        {
-            std::cout << ip << " formatı geçersiz!" << std::endl;
-            std::cerr << "--- Mümkün Formatlar --- " << std::endl;
-            std::cerr << "2-) 192.168.0.1    -> scan single IP" << std::endl;
-            std::cerr << "2-) 192.168.0.*    -> scan all IPs in range" << std::endl;
-            std::cerr << "3-) 192.168.0.1-10 -> scan IPs in range 192.168.0.1 - 192.168.0.10 (10 values)" << std::endl;
-            std::cerr << "4-) 192.168.0.10 192.168.0.20 -> scan just 2 IPs" << std::endl;
-            exit(-1);
-        }
-    }
-}
-
-void take_inputs(std::string& ip, int& start_port, int& end_port)
+void take_inputs(std::vector<std::string>& ip_list,  std::string& ip, int& start_port, int& end_port)
 {
     std::cout << "Target IP: " << std::flush;
-    std::cin >> ip;
+    std::getline(std::cin, ip);
 
-    resolve_ip(ip);
+    ip_list = resolve_ip(ip);
 
     std::cout << "Start Port: " << std::flush;
     std::cin >> start_port;
@@ -136,12 +59,21 @@ int main()
 {
     print_port_scanner("PORT SCANNER");
 
+    std::vector<std::string> ip_list;
     std::string target_ip;
     int start_port;
     int end_port;
+    int choice;
 
-    take_inputs(target_ip, start_port, end_port);
-    scan(target_ip, start_port, end_port);
+    std::cout << "Select Scan Type:\n";
+    std::cout << "1. TCP Connect Scan\n";
+    std::cout << "2. TCP SYN Scan\n";
+    std::cout << "3. UDP Scan\n";
+    std::cout << "Enter choice: ";
+    std::cin >> choice;
+
+    take_inputs(ip_list, target_ip, start_port, end_port);
+    scan(ip_list, start_port, end_port, scan_type_resolver_by_index(choice));
 
     return 0;
 }   
