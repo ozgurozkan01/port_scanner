@@ -7,10 +7,11 @@ enum class scan_type : uint8_t
 {
     tcp_connect,
     tcp_syn,
-    udp_scan
+    udp_scan,
+    none
 };
 
-void scan(const std::vector<std::string>& target_ip_list, int start_port, int end_port, ScanType scanType);
+void scan(const std::vector<std::string>& target_ip_list, int start_port, int end_port, scan_type scanType);
 std::vector<std::string> resolve_ip(const std::string& ip);
 scan_type scan_type_resolver_by_index(int index);
 

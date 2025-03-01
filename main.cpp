@@ -63,17 +63,17 @@ int main()
     std::string target_ip;
     int start_port;
     int end_port;
-    int choice;
+    std::string choice;
 
     std::cout << "Select Scan Type:\n";
     std::cout << "1. TCP Connect Scan\n";
     std::cout << "2. TCP SYN Scan\n";
     std::cout << "3. UDP Scan\n";
     std::cout << "Enter choice: ";
-    std::cin >> choice;
+    std::getline(std::cin, choice);
 
     take_inputs(ip_list, target_ip, start_port, end_port);
-    scan(ip_list, start_port, end_port, scan_type_resolver_by_index(choice));
+    scan(ip_list, start_port, end_port, scan_type_resolver_by_index(atoi(choice.c_str())));
 
     return 0;
 }   
