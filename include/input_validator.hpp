@@ -11,20 +11,56 @@
 #define MIN_PORT 1
 #define MAX_PORT 65535
 
-enum class target_type : u_int8_t
-
+bool is_CIDR_valid(const std::string& target)
 {
-    ip_v4_format,
-    hostname_format,
-    invalid_format
-};
+    if (target.length() < 2) 
+    {
+        std::cerr << "CIDR lenght has to be longer than 2 characters !!\n";
+        return false;
+    }
+
+    if (target[0] != '/') 
+    {
+        std::cerr << "First character of CIDR has to be slash (/) !!\n";
+        return false;
+    }
+
+    std::string number_part = target.substr(1);
+
+    for (char c : number_part) 
+    {
+        if (!std::isdigit(c)) 
+        {
+            std::cerr << "Number part can have only digit values (0-9) !!\n";
+            return false;
+        }
+    }
+
+    try 
+    {
+        int CIDR_value = std::stoi(number_part);
+        if (CIDR_value < 0 || CIDR_value > 32) 
+        {
+            std::cerr << "CIDR can have only numbers between 0-32 !!\n";
+            return false;
+        }
+    } 
+    catch (const std::invalid_argument& e) 
+    {
+        std::cerr << "Invalid Argument by checking CIDR : " << e.what() << std::endl;
+    }
+
+    
+    return true;
+}
 
 bool is_target_ip_v4(const std::string& target)
 {
     struct sockaddr_in socket_addr;
     if (inet_pton(AF_INET, target.c_str(), &(socket_addr.sin_addr)) != 1) 
     {
-        return false;
+        std::cerr << "IP V4 Format must have numbers between 0-255 : " << target << "\n";
+        return false;    
     }
 
     std::stringstream ss(target);
@@ -52,8 +88,8 @@ bool is_target_ip_v4(const std::string& target)
 
         if (octet.length() > 1 && octet[0] == '0') 
         {
-            throw std::invalid_argument("Iopalfkşgaklfgmkaldfg !!\n");
-        }        
+            throw std::invalid_argument("Portions cannot have 0 on left side !!\n");
+        }
     }
 
     return true;
@@ -73,7 +109,7 @@ bool is_target_hostname(const std::string& target)
         // .google.com (x)
         // google.com. (x)
         // google.com  (/)
-        throw std::invalid_argument("Hostnames does not include dot at the beginning!!\n");
+        throw std::invalid_argument("Hostnames does not include dot at the beginning or ending !!\n");
     }
 
     std::stringstream ss(target);
@@ -306,14 +342,4 @@ std::vector<int> parse_ports_string_to_list(const std::string& ports_to_scan)
     }
 
     throw std::invalid_argument("Invalid Port Format !!\n");
-    return std::vector<int>{};
-}
-
-target_type classify_target_type(const std::string& target)
-{
-    if      (is_target_ip_v4(target))    { std::cout << "IP V4 FORMAT\n"; return target_type::ip_v4_format; }
-    else if (is_target_hostname(target)) { std::cout << "HOSTNAME FORMAT\n"; return target_type::hostname_format; }
-
-    std::cout << "INVALID FORMAT\n"; 
-    return target_type::invalid_format;
 }
