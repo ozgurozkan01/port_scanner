@@ -95,12 +95,14 @@ bool is_target_ip_v4(const std::string& target)
     return true;
 }
 
-bool is_target_hostname(const std::string& target)
+bool is_target_domainname(const std::string& target, const int& CIDR)
 {
-    if (target == "localhost")
+    if (CIDR != 32)
     {
-        return true;
+        std::cerr << "Your target is a domain name but CIDR is not 32 : " << CIDR << std::endl;
+        return false;
     }
+    
     
     if (target.front() == '.' || target.back() == '.')
     {
@@ -109,7 +111,8 @@ bool is_target_hostname(const std::string& target)
         // .google.com (x)
         // google.com. (x)
         // google.com  (/)
-        throw std::invalid_argument("Hostnames does not include dot at the beginning or ending !!\n");
+        std::cerr << "Hostnames does not include dot at the beginning or ending !!\n";
+        return false;
     }
 
     std::stringstream ss(target);
@@ -121,18 +124,20 @@ bool is_target_hostname(const std::string& target)
     {
         if (label.empty())
         {
-            std::cout << target << std::endl;
-            throw std::invalid_argument("Invalid format!!\n");
+            std::cerr << "Invalid format!!\n";
+            return false;
         }
         
         if (label.front() == '-' || label.back() == '-') 
         {
-            throw std::invalid_argument("Label does not include at the beginning or end!!\n");
+            std::cerr << "Label does not include at the beginning or end!!\n";
+            return false;
         }
 
         if (label.length() > 63) 
         {
-            throw std::invalid_argument("Label cannot be longer than 63 characters!!\n");
+            std::cerr << "Label cannot be longer than 63 characters!!\n";
+            return false;
         }
         
         for (char c : label) 
@@ -199,7 +204,8 @@ std::vector<int> parse_comma_format(const std::string& ports_to_scan)
         segment_count++;
         if (segment.empty() || !is_string_numeric_exclusive(segment))
         {
-            throw std::invalid_argument("Invalid Port Format : " + segment);
+            std::cerr << "Invalid Port Format : " + segment;
+            exit(1);
         }
         
         try 
@@ -213,25 +219,28 @@ std::vector<int> parse_comma_format(const std::string& ports_to_scan)
         } 
         catch (const std::invalid_argument& e)
         {
-            throw std::invalid_argument("Invalid Port Format: " + segment);
+            std::cerr << "Invalid Port Format: " + segment;
         } 
         catch (const std::out_of_range& e) 
         {
-            throw std::out_of_range("Port is not in the correct range : " + segment);
+            std::cerr << "Port is not in the correct range : " + segment;
         }
     }
     if (segment_count > 0 && parsed_ports_set.empty())
     {
-        throw std::invalid_argument("Could not split in to portions : '" + ports_to_scan + "'");
+        std::cerr << "Could not split in to portions : '" + ports_to_scan + "'";
+        exit(1);
     }
     else if (segment_count == 0 && !ports_to_scan.empty())
     {
-        throw std::invalid_argument("Invalid List Format : '" + ports_to_scan + "'");
+        std::cerr << "Invalid List Format : '" + ports_to_scan + "'";
+        exit(1);
     }
 
     if (parsed_ports_set.empty() && !ports_to_scan.empty()) 
     {
-        throw std::invalid_argument("Could not split port number properly : '" + ports_to_scan + "'");
+        std::cerr << "Could not split port number properly : '" + ports_to_scan + "'";
+        exit(1);
     }
 
     return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
@@ -247,7 +256,8 @@ std::vector<int> parse_dash_format(const std::string& ports_to_scan)
 
     if (start_str.empty() || end_str.empty() || !is_string_numeric_exclusive(start_str) || !is_string_numeric_exclusive(end_str))
     {
-        throw std::invalid_argument("Invalid Format : '" + ports_to_scan + "'");
+        std::cerr << "Invalid Format : '" + ports_to_scan + "'";
+        exit(1);
     }
 
     try
@@ -272,16 +282,17 @@ std::vector<int> parse_dash_format(const std::string& ports_to_scan)
     
     catch (const std::invalid_argument& e) 
     {
-        throw std::invalid_argument("Invalid Number Format : '" + ports_to_scan + "' (" + e.what() + ")");
+        std::cerr << e.what();
     }
     catch (const std::out_of_range& e) 
     {
-        throw std::out_of_range("Out Of Range Number Entry : '" + ports_to_scan + "' (" + e.what() + ")");
+        std::cerr << e.what();
     }
 
     if (parsed_ports_set.empty() && !ports_to_scan.empty()) 
     {
-        throw std::invalid_argument("Could not split port number properly : '" + ports_to_scan + "'");
+        std::cerr << "Could not split port number properly : '" + ports_to_scan + "'";
+        exit(1);
     }
 
     return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
@@ -293,7 +304,8 @@ std::vector<int> parse_single_format(const std::string& ports_to_scan)
 
     if (!is_string_numeric_exclusive(ports_to_scan)) 
     {
-        throw std::invalid_argument("Invalid Format (Not Number): '" + ports_to_scan + "'");
+        std::cerr << "Invalid Format (Not Number): '" + ports_to_scan + "'";
+        exit(1);
     }
     try 
     {
@@ -308,16 +320,17 @@ std::vector<int> parse_single_format(const std::string& ports_to_scan)
     
     catch (const std::invalid_argument& e)
     {
-        throw std::invalid_argument("Invalid Single Port Number Format : '" + ports_to_scan + "' (" + e.what() + ")");
+        std::cerr << e.what();
     } 
     catch (const std::out_of_range& e) 
     { 
-        throw std::out_of_range("Out Of Range Number Entry : '" + ports_to_scan + "' (" + e.what() + ")");
+        std::cerr << e.what();
     }
 
     if (parsed_ports_set.empty() && !ports_to_scan.empty()) 
     {
-        throw std::invalid_argument("Could not split port number properly : '" + ports_to_scan + "'");
+        std::cerr << "Could not split port number properly : '" + ports_to_scan + "'";
+        exit(1);
     }
 
     return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
@@ -341,5 +354,6 @@ std::vector<int> parse_ports_string_to_list(const std::string& ports_to_scan)
         return parse_single_format(ports_to_scan);
     }
 
-    throw std::invalid_argument("Invalid Port Format !!\n");
+    std::cout << "Invalid Port Format !!\n";
+    exit(1);
 }

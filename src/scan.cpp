@@ -5,11 +5,12 @@
 
 void print_invalid_usage(const char* argv)
 {
-    std::cerr << "Usage: " << argv << " <target_ip> </CIDR> [-p ports] [-t time-out]" << std::endl;
+    std::cerr << "Usage: " << argv << " <target_ip/domain_name> </CIDR> [-p ports] [-t time-out]" << std::endl;
+    std::cerr << "< ! IMPORTANT ! > If you type domain name, you should specify /32 CIDR value !!\n"; 
     std::cerr << "Instances:" << std::endl;
     std::cerr << " - " << argv << " 192.168.1.1 /16 -p 22,80,100-200" << std::endl;
-    std::cerr << " - " << argv << " 192.168.1.1 /16 -p 1-65535 -t 500" << std::endl;
-    std::cerr << " - " << argv << " 192.168.1.1 >>>>> !! If any ports do not specify as input, most popular ports are scanned. " << std::endl;
+    std::cerr << " - " << argv << " 172.16.1.1 /12 -p 1-65535 -t 500" << std::endl;
+    std::cerr << " - " << argv << " google.com /32 -p 1-65535 -t 500" << std::endl;
     std::cerr << "Time-out: in milliseconds (as default: 1000ms)." << std::endl;
 }
 
