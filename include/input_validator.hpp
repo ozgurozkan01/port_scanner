@@ -191,9 +191,9 @@ bool is_string_numeric_exclusive(const std::string& s)
     return std::all_of(s.begin(), s.end(), ::isdigit);
 }
 
-std::vector<int> parse_comma_format(const std::string& ports_to_scan) 
+std::vector<uint16_t> parse_comma_format(const std::string& ports_to_scan) 
 {
-    std::set<int> parsed_ports_set;
+    std::set<uint16_t> parsed_ports_set;
     
     std::stringstream main_ss(ports_to_scan);
     std::string segment;
@@ -243,12 +243,12 @@ std::vector<int> parse_comma_format(const std::string& ports_to_scan)
         exit(1);
     }
 
-    return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
+    return std::vector<uint16_t>(parsed_ports_set.begin(), parsed_ports_set.end());
 }
 
-std::vector<int> parse_dash_format(const std::string& ports_to_scan) 
+std::vector<uint16_t> parse_dash_format(const std::string& ports_to_scan) 
 {
-    std::set<int> parsed_ports_set;
+    std::set<uint16_t> parsed_ports_set;
 
     size_t dash_pos = ports_to_scan.find('-');
     std::string start_str = ports_to_scan.substr(0, dash_pos);
@@ -295,12 +295,12 @@ std::vector<int> parse_dash_format(const std::string& ports_to_scan)
         exit(1);
     }
 
-    return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
+    return std::vector<uint16_t>(parsed_ports_set.begin(), parsed_ports_set.end());
 }
 
-std::vector<int> parse_single_format(const std::string& ports_to_scan) 
+std::vector<uint16_t> parse_single_format(const std::string& ports_to_scan) 
 {
-    std::set<int> parsed_ports_set;
+    std::set<uint16_t> parsed_ports_set;
 
     if (!is_string_numeric_exclusive(ports_to_scan)) 
     {
@@ -333,10 +333,10 @@ std::vector<int> parse_single_format(const std::string& ports_to_scan)
         exit(1);
     }
 
-    return std::vector<int>(parsed_ports_set.begin(), parsed_ports_set.end());
+    return std::vector<uint16_t>(parsed_ports_set.begin(), parsed_ports_set.end());
 }
 
-std::vector<int> parse_ports_string_to_list(const std::string& ports_to_scan)
+std::vector<uint16_t>parse_ports_string_to_list(const std::string& ports_to_scan)
 {
     bool has_comma = (ports_to_scan.find(',') != std::string::npos); // 22,80,443 -> 3 ports
     bool has_dash = (ports_to_scan.find('-') != std::string::npos);  // 22-80     -> ports in range
@@ -356,4 +356,16 @@ std::vector<int> parse_ports_string_to_list(const std::string& ports_to_scan)
 
     std::cout << "Invalid Port Format !!\n";
     exit(1);
+}
+
+scan_type get_scan_type(const std::string& scan_type_string)
+{
+    if (scan_type_string == "-tc") { return scan_type::tcp_connect; }
+    if (scan_type_string == "-ts") { return scan_type::tcp_syn; }
+    if (scan_type_string == "-ta") { return scan_type::tcp_ack; }
+    if (scan_type_string == "-tf") { return scan_type::tcp_fin; }
+    if (scan_type_string == "-u")  { return scan_type::udp; }
+
+    std::cerr << "Specified invalid scan type !!\n";
+    return scan_type::invalid;
 }

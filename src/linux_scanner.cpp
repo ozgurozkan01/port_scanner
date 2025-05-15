@@ -4,11 +4,15 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <cstring>
+#include <sys/socket.h>
+#include <fcntl.h>
+#include <unistd.h>
 
-linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::string& ports, const std::string& CIDR_string,  const int timeout_ms) : 
-    target_host_or_ip(target_host_or_ip),
+linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::string& ports, const std::string& CIDR_string, const std::string& scan_type, const int timeout_ms = 1000) : 
     timeout_ms(timeout_ms)
 {
+    _scan_target.target_str = target_host_or_ip;
+
     is_scanning_initiated = false;
     if (timeout_ms <= 0)
     {
@@ -24,27 +28,28 @@ linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::st
 
     CIDR = stoi(CIDR_string.substr(1)); 
 
-    _target_type = classify_target_type(target_host_or_ip);
+    _target_type = classify_target_type(_scan_target.target_str);
 
     if (_target_type == target_type::invalid_format) 
     {   
-        std::cerr << "Target '" + this->target_host_or_ip + "' is not a valid IPv4 or domain-name.";
+        std::cerr << "Target '" + this->_scan_target.target_str + "' is not a valid IPv4 or domain-name.";
         exit(1);
     }
 
     else if (_target_type == target_type::ip_v4_format) 
     {
-        if (inet_pton(AF_INET, this->target_host_or_ip.c_str(), &this->ipv4_addr_target) != 1) 
+        if (inet_pton(AF_INET, this->_scan_target.target_str.c_str(), &this->_scan_target.ipv4_addr) != 1) 
         {
-            std::cerr << "Failed to convert IP string to binary: " + this->target_host_or_ip;
+            std::cerr << "Failed to convert IP string to binary: " + this->_scan_target.target_str;
             exit(1);
         }
 
         _ip_range_type = classify_ip_range_type();
     } 
-    else if (_target_type == target_type::domain_name)
+ 
+    else if (_target_type == target_type::domain_name_format)
     {
-        std::string original_hostname = this->target_host_or_ip;
+        std::string original_hostname = this->_scan_target.target_str;
         std::string resolved_ip_str = resolve_domainname_to_ip(original_hostname);
 
         if (resolved_ip_str.empty())
@@ -54,7 +59,7 @@ linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::st
         }
         std::cout << "Resolved " << original_hostname << " to IP: " << resolved_ip_str << std::endl;
 
-        if (inet_pton(AF_INET, resolved_ip_str.c_str(), &this->ipv4_addr_target) != 1) 
+        if (inet_pton(AF_INET, resolved_ip_str.c_str(), &this->_scan_target.ipv4_addr) != 1) 
         {
             std::cerr << "Internal error: Failed to convert resolved IP string '" << resolved_ip_str << "' to binary.\n";
             exit(1);
@@ -63,11 +68,28 @@ linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::st
         _ip_range_type = classify_ip_range_type();
     }
 
-    ports_to_scan = parse_ports_string_to_list(ports);
+    input_port_list = parse_ports_string_to_list(ports);
     
-    if (ports_to_scan.empty())
+    if (input_port_list.empty())
     {
         std::cerr << "Port information is not provided !!\n";
+        exit(1);
+    }
+
+    for (auto port : input_port_list)
+    {
+        _scan_target.ports_to_scan.push_back({port, port_statu::unknown, "< NO DESCRIPTION >", "< NO NAME >"});
+    }
+
+    for (auto port : _scan_target.ports_to_scan)
+    {
+        std::cout << port.number << ", " << port.info << ", " << get_port_statu(port.statu) << "\n";
+    }
+
+    _scan_type == get_scan_type(scan_type);
+
+    if (_scan_type == scan_type::invalid)
+    {
         exit(1);
     }
 }
@@ -129,7 +151,7 @@ ip_range_type linux_scanner::classify_ip_range_type()
 {
     // host byte order -> Little endian
     // network byte order -> Big endian
-    uint32_t target_ip_numeric_H = ntohl(this->ipv4_addr_target.s_addr);
+    uint32_t target_ip_numeric_H = ntohl(this->_scan_target.ipv4_addr.s_addr);
 
     uint32_t scan_range_netmask_H;
     if      (this->CIDR == 0)  { scan_range_netmask_H = 0x00000000; } 
@@ -196,9 +218,9 @@ ip_range_type linux_scanner::classify_ip_range_type()
         return ip_range_type::private_ip;
     }
 
+    if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "127.0.0.0"   , 8))  return ip_range_type::localhost; // Loopback bloğu
     if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "0.0.0.0"     , 8))  return ip_range_type::reserved_unusable;
     if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "100.64.0.0"  , 10)) return ip_range_type::reserved_unusable;
-    if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "127.0.0.0"   , 8))  return ip_range_type::reserved_unusable; // Loopback bloğu
     if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "169.254.0.0" , 16)) return ip_range_type::reserved_unusable;
     if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "192.0.0.0"   , 24)) return ip_range_type::reserved_unusable;
     if (is_range_fully_contained_in_block(scan_range_network_addr_H, scan_range_broadcast_addr_H, "192.0.2.0"   , 24)) return ip_range_type::reserved_unusable; // TEST-NET-1
@@ -217,10 +239,6 @@ ip_range_type linux_scanner::classify_ip_range_type()
     return ip_range_type::public_ip;
 } 
 
-void linux_scanner::scan_localhost_network() {}
-void linux_scanner::scan_internal_network()  {}
-void linux_scanner::scan_external_network()  {}
-
 void linux_scanner::scan()
 {
     if (is_scanning_initiated)
@@ -230,20 +248,20 @@ void linux_scanner::scan()
     }
 
     is_scanning_initiated = true;
-    open_ports.clear();
+    // this->_scan_target.open_ports.clear();
 
     switch (_ip_range_type)
     {
     case ip_range_type::localhost:
-        std::cout << "Localhost is scanning...\n";
+        std::cout << "\n----- Localhost is scanning... -----\n\n";
         scan_localhost_network();
         break;
     case ip_range_type::private_ip:
-        std::cout << "Internal is scanning...\n";
+        std::cout << "\n----- Internal is scanning... -----\n\n";
         scan_internal_network();
         break;
     case ip_range_type::public_ip:
-        std::cout << "External is scanning...\n";
+        std::cout << "\n----- External is scanning... -----\n\n";
         scan_external_network();
         break;
     case ip_range_type::reserved_unusable:
@@ -258,8 +276,192 @@ void linux_scanner::scan()
 target_type linux_scanner::classify_target_type(const std::string& target)
 {
     if      (is_target_ip_v4(target))    { std::cout << "IP V4 FORMAT       : "  << target << "\n"; return target_type::ip_v4_format; }
-    else if (is_target_domainname(target, CIDR)) { std::cout << "DOMAIN NAME FORMAT : "  << target << "\n"; return target_type::domain_name;  }
+    else if (is_target_domainname(target, CIDR)) { std::cout << "DOMAIN NAME FORMAT : "  << target << "\n"; return target_type::domain_name_format;  }
 
     std::cout << "INVALID FORMAT : " << target << "\n"; 
     return target_type::invalid_format;
+}
+
+void linux_scanner::tcp_connect_scan()
+{
+    std::cout << "\nInitiating TCP Connect Scan (-tc) for target: " << this->_scan_target.target_str << " (" << inet_ntoa(this->_scan_target.ipv4_addr) << ")" << std::endl;
+    std::cout << "Timeout per port: " << this->timeout_ms << "ms" << std::endl;
+    std::cout << "-----------------------------------------------------" << std::endl;
+    std::cout << "PORT\tSTATE\tSERVICE (from scan)" << std::endl;
+    std::cout << "-----------------------------------------------------" << std::endl;
+
+    _scan_target.open_ports.clear();
+
+    char ip_str_buffer[INET_ADDRSTRLEN];
+
+    if (inet_ntop(AF_INET, &this->_scan_target.ipv4_addr, ip_str_buffer, sizeof(ip_str_buffer)) == nullptr)
+    {
+        perror("tcp_connect_scan: inet_ntop failed for target IP");
+        return;
+    }
+    std::string current_target_ip_str(ip_str_buffer);
+
+    for (auto port : this->_scan_target.ports_to_scan)
+    {
+        struct servent service_entry_data;
+        struct servent *service_entry_result = nullptr;
+        char service_buffer[1024];
+        port.service_name = "unknown";
+        if (getservbyport_r(htons(port.number), "tcp", &service_entry_data, service_buffer, sizeof(service_buffer), &service_entry_result) == 0 && service_entry_result != nullptr)
+        {
+            port.service_name = service_entry_result->s_name;
+        }
+
+        int sock_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (sock_fd < 0)
+        {
+            port.statu = port_statu::close;
+            port.info = "Socket creation failed: " + std::string(strerror(errno));
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            continue;
+        }
+
+        struct sockaddr_in server_addr{0};
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(port.number);
+        server_addr.sin_addr = this->_scan_target.ipv4_addr;
+
+        int get_flag = fcntl(sock_fd, F_GETFL, 0);
+        if (get_flag == -1)
+        {
+            close(sock_fd);
+            port.statu = port_statu::close;
+            port.info = "fcntl(F_GETFL) failed: " + std::string(strerror(errno));
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            continue;
+        }
+
+        int set_flag = fcntl(sock_fd, F_SETFL, get_flag | O_NONBLOCK); 
+        if (set_flag == -1)
+        {
+            close(sock_fd);
+            port.statu = port_statu::close;
+            port.info = "fcntl(O_NONBLOCK) failed: " + std::string(strerror(errno));
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            continue;
+        }
+
+        int connect_result = connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr));
+        bool port_is_open_flag = false;
+
+        if (connect_result == 0)
+        {
+            port_is_open_flag = true;
+            port.info = "\tConnected: (immediate)";
+        }
+        else if (errno == EINPROGRESS)
+        {
+            fd_set write_fds;
+            FD_ZERO(&write_fds);
+            FD_SET(sock_fd, &write_fds);
+
+            struct timeval tv;
+            tv.tv_sec = this->timeout_ms / 1000;
+            tv.tv_usec = (this->timeout_ms % 1000) * 1000;
+
+            int select_status = select(sock_fd + 1, nullptr, &write_fds, nullptr, &tv);
+
+            if (select_status > 0)
+            {
+                if (FD_ISSET(sock_fd, &write_fds))
+                {
+                    int optval = -1;
+                    socklen_t optlen = sizeof(optval);
+                    if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &optval, &optlen) == 0)
+                    {
+                        if (optval == 0)
+                        {
+                            port_is_open_flag = true;
+                            port.info = "\tConnected: (selected)";
+                        }
+                        else
+                        {
+                            port.info = "Connection error: " + std::string(strerror(optval));
+                        }
+                    }
+                    else
+                    {
+                        port.info = "getsockopt failed: " + std::string(strerror(errno));
+                    }
+                }
+            }
+            else if (select_status == 0)
+            {
+                port.info = "Timeout";
+            }
+            else
+            {
+                port.info = "Select error: " + std::string(strerror(errno));
+            }
+        }
+        else
+        {
+            port.info = "Immediate connect error: " + std::string(strerror(errno));
+        }
+
+        close(sock_fd);
+
+        if (port_is_open_flag)
+        {
+            port.statu = port_statu::open;
+            _scan_target.open_ports.push_back(port);
+        }
+        else
+        {
+            port.statu = port_statu::close;
+            if (port.info.empty() && port.statu == port_statu::close) {}
+        }
+
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+    }
+
+    std::cout << "-----------------------------------------------------" << std::endl;
+    if (_scan_target.open_ports.empty())
+    {
+        std::cout << "No open ports found." << std::endl;
+    }
+    else
+    {
+        std::cout << "Scan complete. Open ports on " << current_target_ip_str << ":" << std::endl;
+        for (auto open_port : _scan_target.open_ports)
+        {
+            std::cout << "-" << open_port.number << " (" << open_port.service_name << ") " << "/ tcp" << std::endl;
+        }
+    }
+    std::cout << "-----------------------------------------------------" << std::endl;
+}
+
+void linux_scanner::tcp_syn_scan()
+{
+
+}
+void linux_scanner::tcp_ack_scan()
+{
+    
+}
+void linux_scanner::tcp_fin_scan()
+{
+    
+}
+void linux_scanner::udp_scan()
+{
+    
+}
+
+void linux_scanner::scan_localhost_network() { tcp_connect_scan(); }
+void linux_scanner::scan_internal_network()  { tcp_connect_scan(); }
+void linux_scanner::scan_external_network()  { tcp_connect_scan(); }
+
+std::string linux_scanner::get_port_statu(port_statu statu)
+{
+    if (statu == port_statu::close)   { return "CLOSE"; }
+    if (statu == port_statu::open)    { return "OPEN"; }
+    if (statu == port_statu::unknown) { return "UNKNOWN"; }
+
+    return "INVALID STUATION";
 }

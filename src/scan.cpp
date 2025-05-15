@@ -8,9 +8,9 @@ void print_invalid_usage(const char* argv)
     std::cerr << "Usage: " << argv << " <target_ip/domain_name> </CIDR> [-p ports] [-t time-out]" << std::endl;
     std::cerr << "< ! IMPORTANT ! > If you type domain name, you should specify /32 CIDR value !!\n"; 
     std::cerr << "Instances:" << std::endl;
-    std::cerr << " - " << argv << " 192.168.1.1 /16 -p 22,80,100-200" << std::endl;
-    std::cerr << " - " << argv << " 172.16.1.1 /12 -p 1-65535 -t 500" << std::endl;
-    std::cerr << " - " << argv << " google.com /32 -p 1-65535 -t 500" << std::endl;
+    std::cerr << " - " << argv << " 192.168.1.1 /16 -p 22,80,100 -t 1000 tcp_connect" << std::endl;
+    std::cerr << " - " << argv << " 172.16.1.1 /12 -p 1-65535 -t 500 tcp_syn" << std::endl;
+    std::cerr << " - " << argv << " google.com /32 -p 1-65535 -t 500 udp" << std::endl;
     std::cerr << "Time-out: in milliseconds (as default: 1000ms)." << std::endl;
 }
 
@@ -28,7 +28,7 @@ std::vector<std::string> split_input_to_usable(int argc, char* argv[])
 
 int main(int argc, char *argv[]) 
 {
-    if (argc < 7)
+    if (argc < 8)
     {
         print_invalid_usage(argv[0]);   
         return 1;
@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
     std::string ports = argv[4];
     std::string _t = argv[5];
     std::string timeout_ms = argv[6];
+    std::string scan_type = argv[7];
 
     if (_p != "-p")
     {
@@ -52,26 +53,18 @@ int main(int argc, char *argv[])
         throw std::invalid_argument("Invalid Usage !!\n");
         return 1;
     }
-    
-    /* for(int i = 0; i < argc; i++)
-    {
-        std::cout << argv[i] << std::endl;
-    }*/ 
 
-    /* 
-    for (const auto port : ports_to_scan)
-    {
-        std::cout << "-" << port << "-" << std::endl;
-    } 
-    */
-    
 #ifdef __linux__
-    if (ip_or_host.empty() || ports.empty() || CIDR.empty() || timeout_ms.empty()) { return 1; }
+    if (ip_or_host.empty() || ports.empty() || CIDR.empty() || timeout_ms.empty() || scan_type.empty()) 
+    { 
+        std::cerr << "You have to enter correct inputs !!\n";
+        return 1; 
+    }
     
     int timeout_ms_int = stoi(timeout_ms);
-    linux_scanner _linux_scanner(ip_or_host, ports, CIDR, timeout_ms_int);
+    linux_scanner _linux_scanner(ip_or_host, ports, CIDR, scan_type, timeout_ms_int);
     _linux_scanner.scan();
-
 #endif
+
     return 0;
 }
