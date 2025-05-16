@@ -57,7 +57,7 @@ linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::st
             std::cerr << "Hostname '" << original_hostname << "' could not be resolved to an IPv4 address!\n";
             exit(1);
         }
-        std::cout << "Resolved " << original_hostname << " to IP: " << resolved_ip_str << std::endl;
+        std::cout << "Resolved " << original_hostname << " to IP: " << resolved_ip_str << "\n";
 
         if (inet_pton(AF_INET, resolved_ip_str.c_str(), &this->_scan_target.ipv4_addr) != 1) 
         {
@@ -79,11 +79,6 @@ linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::st
     for (auto port : input_port_list)
     {
         _scan_target.ports_to_scan.push_back({port, port_statu::unknown, "< NO DESCRIPTION >", "< NO NAME >"});
-    }
-
-    for (auto port : _scan_target.ports_to_scan)
-    {
-        std::cout << port.number << ", " << port.info << ", " << get_port_statu(port.statu) << "\n";
     }
 
     _scan_type == get_scan_type(scan_type);
@@ -108,7 +103,7 @@ std::string linux_scanner::resolve_domainname_to_ip(const std::string& hostname)
     status = getaddrinfo(hostname.c_str(), nullptr, &hints, &result_list);
     if (status != 0) 
     {
-        std::cerr << "getaddrinfo error for '" << hostname << "': " << gai_strerror(status) << std::endl;
+        std::cerr << "getaddrinfo error for '" << hostname << "': " << gai_strerror(status) << "\n";
         return resolved_ip;
     }
 
@@ -193,7 +188,7 @@ ip_range_type linux_scanner::classify_ip_range_type()
         uint32_t block_base_numeric_H;
         if (!static_ip_string_to_uint32(block_ip_str, block_base_numeric_H)) 
         {
-            std::cerr << "Internal error: Could not convert static block IP: " << block_ip_str << std::endl;
+            std::cerr << "Internal error: Could not convert static block IP: " << block_ip_str << "\n";
             return false;
         }
 
@@ -284,14 +279,6 @@ target_type linux_scanner::classify_target_type(const std::string& target)
 
 void linux_scanner::tcp_connect_scan()
 {
-    std::cout << "\nInitiating TCP Connect Scan (-tc) for target: " << this->_scan_target.target_str << " (" << inet_ntoa(this->_scan_target.ipv4_addr) << ")" << std::endl;
-    std::cout << "Timeout per port: " << this->timeout_ms << "ms" << std::endl;
-    std::cout << "-----------------------------------------------------" << std::endl;
-    std::cout << "PORT\tSTATE\tSERVICE (from scan)" << std::endl;
-    std::cout << "-----------------------------------------------------" << std::endl;
-
-    _scan_target.open_ports.clear();
-
     char ip_str_buffer[INET_ADDRSTRLEN];
 
     if (inet_ntop(AF_INET, &this->_scan_target.ipv4_addr, ip_str_buffer, sizeof(ip_str_buffer)) == nullptr)
@@ -299,7 +286,16 @@ void linux_scanner::tcp_connect_scan()
         perror("tcp_connect_scan: inet_ntop failed for target IP");
         return;
     }
+
     std::string current_target_ip_str(ip_str_buffer);
+
+    std::cout << "\nInitiating TCP Connect Scan (-tc) for target: " << this->_scan_target.target_str << " (" << current_target_ip_str << ")\n";
+    std::cout << "Timeout per port: " << this->timeout_ms << "ms\n";
+    std::cout << "-----------------------------------------------------\n";
+    std::cout << "PORT\tSTATE\tSERVICE (from scan)\n";
+    std::cout << "-----------------------------------------------------\n";
+
+    // _scan_target.open_ports.clear();
 
     for (auto port : this->_scan_target.ports_to_scan)
     {
@@ -317,7 +313,7 @@ void linux_scanner::tcp_connect_scan()
         {
             port.statu = port_statu::close;
             port.info = "Socket creation failed: " + std::string(strerror(errno));
-            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << "\n";
             continue;
         }
 
@@ -332,7 +328,7 @@ void linux_scanner::tcp_connect_scan()
             close(sock_fd);
             port.statu = port_statu::close;
             port.info = "fcntl(F_GETFL) failed: " + std::string(strerror(errno));
-            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << "\n";
             continue;
         }
 
@@ -342,7 +338,7 @@ void linux_scanner::tcp_connect_scan()
             close(sock_fd);
             port.statu = port_statu::close;
             port.info = "fcntl(O_NONBLOCK) failed: " + std::string(strerror(errno));
-            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << "\n";
             continue;
         }
 
@@ -392,7 +388,7 @@ void linux_scanner::tcp_connect_scan()
             }
             else if (select_status == 0)
             {
-                port.info = "Timeout";
+                port.info = "\tTimeout";
             }
             else
             {
@@ -417,23 +413,23 @@ void linux_scanner::tcp_connect_scan()
             if (port.info.empty() && port.statu == port_statu::close) {}
         }
 
-            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << std::endl;
+            std::cout << port.number << "\t" << get_port_statu(port.statu) << "\t" << " " << port.info << "\n";
     }
 
-    std::cout << "-----------------------------------------------------" << std::endl;
+    std::cout << "-----------------------------------------------------\n";
     if (_scan_target.open_ports.empty())
     {
-        std::cout << "No open ports found." << std::endl;
+        std::cout << "< NO OPEN PORTS FOUND >\n";
     }
     else
     {
-        std::cout << "Scan complete. Open ports on " << current_target_ip_str << ":" << std::endl;
+        std::cout << "Scan complete. Open ports on " << current_target_ip_str << ":\n";
         for (auto open_port : _scan_target.open_ports)
         {
-            std::cout << "-" << open_port.number << " (" << open_port.service_name << ") " << "/ tcp" << std::endl;
+            std::cout << "-" << open_port.number << " (" << open_port.service_name << ") " << "/ tcp\n";
         }
     }
-    std::cout << "-----------------------------------------------------" << std::endl;
+    std::cout << "-----------------------------------------------------\n";
 }
 
 void linux_scanner::tcp_syn_scan()

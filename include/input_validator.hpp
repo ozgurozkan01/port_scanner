@@ -47,7 +47,7 @@ bool is_CIDR_valid(const std::string& target)
     } 
     catch (const std::invalid_argument& e) 
     {
-        std::cerr << "Invalid Argument by checking CIDR : " << e.what() << std::endl;
+        std::cerr << "Invalid Argument by checking CIDR : " << e.what() << "\n";
     }
 
     
@@ -99,7 +99,7 @@ bool is_target_domainname(const std::string& target, const int& CIDR)
 {
     if (CIDR != 32)
     {
-        std::cerr << "Your target is a domain name but CIDR is not 32 : " << CIDR << std::endl;
+        std::cerr << "Your target is a domain name but CIDR is not 32 : " << CIDR << "\n";
         return false;
     }
     

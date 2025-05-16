@@ -33,6 +33,7 @@ enum class port_statu : uint8_t
 {
     open,
     close,
+    filtered,
     unknown 
 };
 
@@ -52,6 +53,15 @@ struct scan_target
     std::vector<port_info> open_ports;
 };
 
+struct tcp_checksum_header
+{
+    uint32_t source_ip;
+    uint32_t destination_ip;
+    uint8_t place_holder;
+    uint8_t protocol_field;
+    uint16_t tcp_length;
+};
+
 class linux_scanner
 {
 public:
@@ -62,8 +72,13 @@ public:
     void scan_internal_network();
     void scan_external_network();
 
+    // TCP CONNECTION SCANNING
     void tcp_connect_scan();
+    // TCP SYN SCANNING
     void tcp_syn_scan();
+    uint16_t calculate_checksum(const char* buffer, const uint32_t size);
+    uint16_t calculate_tcp_checksum(const char* buffer, const uint32_t size);
+
     void tcp_ack_scan();
     void tcp_fin_scan();
     void udp_scan();
@@ -74,8 +89,6 @@ public:
 
     ip_range_type classify_ip_range_type();
     target_type classify_target_type(const std::string& target);
-    
-    scan_target _scan_target;
 
     std::vector<uint16_t>input_port_list;
 
@@ -83,7 +96,10 @@ public:
     int CIDR;
     bool is_scanning_initiated;
 
-    target_type _target_type;
+    scan_target _scan_target;
+
     ip_range_type _ip_range_type;
     scan_type _scan_type;
+    target_type _target_type;
+    tcp_checksum_header _tcp_checksum_header;
 };
