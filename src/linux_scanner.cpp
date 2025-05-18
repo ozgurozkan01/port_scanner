@@ -9,7 +9,7 @@
 #include <unistd.h>
 
 linux_scanner::linux_scanner(const std::string& target_host_or_ip, const std::string& ports, const std::string& CIDR_string, const std::string& scan_type, const int timeout_ms = 1000) : 
-    timeout_ms(timeout_ms)
+    timeout_ms(timeout_ms)  
 {
     _scan_target.target_str = target_host_or_ip;
 
@@ -293,11 +293,11 @@ void linux_scanner::tcp_connect_scan()
     std::cout << "Timeout per port: " << this->timeout_ms << "ms\n";
     std::cout << "-----------------------------------------------------\n";
     std::cout << "PORT\tSTATE\tSERVICE (from scan)\n";
-    std::cout << "-----------------------------------------------------\n";
+    std::cout << "-----------------------------------------------------\n"; 
 
     // _scan_target.open_ports.clear();
 
-    for (auto port : this->_scan_target.ports_to_scan)
+    for (port_info& port : _scan_target.ports_to_scan)
     {
         struct servent service_entry_data;
         struct servent *service_entry_result = nullptr;
