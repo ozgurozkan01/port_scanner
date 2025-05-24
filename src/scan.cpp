@@ -5,7 +5,7 @@
 
 void print_invalid_usage(const char* argv)
 {
-    std::cerr << "Usage: " << argv << " <target_ip/domain_name> </CIDR> [-p ports] [-t time-out]\n";
+    std::cerr << "Usage: " << argv << " <target_ip/domain_name> </CIDR> [-p ports] [-t time-out] -tc\n";
     std::cerr << "< ! IMPORTANT ! > If you type domain name, you should specify /32 CIDR value !!\n"; 
     std::cerr << "Instances:\n";
     std::cerr << " - " << argv << " 192.168.1.1 /16 -p 22,80,100 -t 1000 tcp_connect\n";
@@ -71,3 +71,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+//  ./scan scanme.nmap.org /32 -p 21,22,53,80,443 -t 1000 -tc
